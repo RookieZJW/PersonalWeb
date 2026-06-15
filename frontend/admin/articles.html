@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文章管理 - 管理后台</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="admin-topbar">
+    <div class="brand">⚙️ 管理后台</div>
+    <div class="user-info">
+      <span id="admin-nickname">管理员</span>
+      <button id="logout-btn" class="logout-btn">退出登录</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-title">管理菜单</div>
+      <a href="dashboard.html"><span class="icon">📊</span> 仪表盘</a>
+      <a href="articles.html" class="active"><span class="icon">📝</span> 文章管理</a>
+      <a href="messages.html"><span class="icon">💬</span> 留言管理</a>
+      <a href="projects.html"><span class="icon">🚀</span> 项目管理</a>
+      <a href="gallery.html"><span class="icon">📷</span> 相册管理</a>
+      <a href="settings.html"><span class="icon">⚙️</span> 站点设置</a>
+    </aside>
+
+    <main class="admin-main">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <h2>📝 文章管理</h2>
+        <button class="btn btn-primary" onclick="openEditor()">+ 写新文章</button>
+      </div>
+
+      <!-- 文章列表表格 -->
+      <div class="card" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>标题</th>
+              <th>分类</th>
+              <th>状态</th>
+              <th>阅读量</th>
+              <th>发布时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="articles-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:40px;">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分页 -->
+      <div id="pagination" class="pagination" style="margin-top:24px;"></div>
+    </main>
+  </div>
+
+  <!-- 编辑Modal -->
+  <div id="editor-modal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="editor-title">写新文章</h3>
+      <form id="article-form">
+        <div class="form-group">
+          <label>文章标题</label>
+          <input type="text" id="art-title" class="glow-input" required>
+        </div>
+        <div class="form-group">
+          <label>分类</label>
+          <select id="art-category" class="glow-input">
+            <option value="">请选择分类</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>摘要</label>
+          <input type="text" id="art-summary" class="glow-input" placeholder="文章简短摘要（用于列表展示）">
+        </div>
+        <div class="form-group">
+          <label>标签（逗号分隔）</label>
+          <input type="text" id="art-tags" class="glow-input" placeholder="JavaScript, Node.js, 教程">
+        </div>
+        <div class="form-group">
+          <label>正文内容（HTML格式）</label>
+          <textarea id="art-content" class="glow-textarea" style="min-height:300px;" required></textarea>
+          <span class="hint">支持HTML标签，如 &lt;h2&gt;标题&lt;/h2&gt;, &lt;p&gt;段落&lt;/p&gt;, &lt;pre&gt;代码&lt;/pre&gt;</span>
+        </div>
+        <div class="form-group">
+          <label>状态</label>
+          <select id="art-status" class="glow-input">
+            <option value="1">发布</option>
+            <option value="0">草稿</option>
+            <option value="2">下架</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="art-pinned"> 置顶</label>
+        </div>
+        <input type="hidden" id="art-id">
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="button" class="btn btn-secondary" onclick="closeEditor()">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/admin.js"></script>
+  <script>
+    let currentPage = 1;
+
+    // 加载分类选项
+    async function loadCategoryOptions() {
+      try {
+        const res = await articlesAPI.categories();
+        const select = document.getElementById('art-category');
+        select.innerHTML = '<option value="">请选择分类</option>';
+        res.data.forEach(cat => {
+          select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+        });
+      } catch (e) {}
+    }
+
+    // 加载文章列表
+    async function loadArticles() {
+      const tbody = document.getElementById('articles-tbody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;">加载中...</td></tr>';
+
+      try {
+        const res = await articlesAPI.list({ page: currentPage, pageSize: 20, status: '' });
+        const { list, pagination } = res.data;
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">暂无文章</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(a => {
+          const statusMap = {0: 'badge-warning', 1: 'badge-success', 2: 'badge-danger'};
+          const statusText = {0: '草稿', 1: '已发布', 2: '已下架'};
+          return `
+            <tr>
+              <td><strong>${escapeHtml(a.title)}</strong></td>
+              <td>${a.category_name || '-'}</td>
+              <td><span class="badge ${statusMap[a.status] || 'badge-info'}">${statusText[a.status] || a.status}</span></td>
+              <td>${a.view_count}</td>
+              <td>${formatDate(a.published_at)}</td>
+              <td class="actions">
+                <button class="btn btn-sm btn-secondary" onclick="openEditor(${a.id})">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteArticle(${a.id},'${escapeHtml(a.title)}')">删除</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // 分页
+        const pagContainer = document.getElementById('pagination');
+        pagContainer.innerHTML = '';
+        for (let i = 1; i <= pagination.totalPages; i++) {
+          const btn = document.createElement('button');
+          btn.className = 'page-btn ' + (i === pagination.page ? 'active' : '');
+          btn.textContent = i;
+          btn.addEventListener('click', () => { currentPage = i; loadArticles(); });
+          pagContainer.appendChild(btn);
+        }
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#ef4444;">加载失败: ' + e.message + '</td></tr>';
+      }
+    }
+
+    // 打开编辑器
+    async function openEditor(id) {
+      await loadCategoryOptions();
+      const modal = document.getElementById('editor-modal');
+      document.getElementById('editor-title').textContent = id ? '编辑文章' : '写新文章';
+      document.getElementById('article-form').reset();
+      document.getElementById('art-id').value = '';
+
+      if (id) {
+        try {
+          const res = await articlesAPI.detail(id);
+          const a = res.data;
+          document.getElementById('art-id').value = a.id;
+          document.getElementById('art-title').value = a.title;
+          document.getElementById('art-summary').value = a.summary || '';
+          document.getElementById('art-tags').value = a.tags || '';
+          document.getElementById('art-content').value = a.content || '';
+          document.getElementById('art-status').value = a.status;
+          document.getElementById('art-pinned').checked = a.is_pinned === 1;
+          if (a.category_id) document.getElementById('art-category').value = a.category_id;
+        } catch (e) {
+          showToast('加载文章失败: ' + e.message, 'error');
+          return;
+        }
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeEditor() {
+      document.getElementById('editor-modal').classList.remove('active');
+    }
+
+    // 提交表单
+    document.getElementById('article-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('art-id').value;
+      const data = {
+        title: document.getElementById('art-title').value.trim(),
+        summary: document.getElementById('art-summary').value.trim(),
+        content: document.getElementById('art-content').value,
+        category_id: document.getElementById('art-category').value || null,
+        tags: document.getElementById('art-tags').value.trim(),
+        status: parseInt(document.getElementById('art-status').value),
+        is_pinned: document.getElementById('art-pinned').checked ? 1 : 0
+      };
+
+      try {
+        if (id) {
+          await articlesAPI.update(id, data);
+          showToast('文章更新成功', 'success');
+        } else {
+          await articlesAPI.create(data);
+          showToast('文章创建成功', 'success');
+        }
+        closeEditor();
+        loadArticles();
+      } catch (err) {
+        showToast('保存失败: ' + err.message, 'error');
+      }
+    });
+
+    async function deleteArticle(id, title) {
+      if (!confirm('确定删除文章「' + title + '」吗？此操作不可恢复。')) return;
+      try {
+        await articlesAPI.delete(id);
+        showToast('文章已删除', 'success');
+        loadArticles();
+      } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleDateString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit' });
+    }
+
+    // 初始化
+    loadArticles();
+  </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文章详情 - 个人网站</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">&lt;<span>C</span>odeNinja /&gt;</a>
+      <div class="nav-links">
+        <a href="index.html">首页</a>
+        <a href="about.html">关于我</a>
+        <a href="articles.html" class="active">文章</a>
+        <a href="projects.html">项目</a>
+        <a href="gallery.html">相册</a>
+        <a href="guestbook.html">留言板</a>
+      </div>
+      <div class="hamburger"><span></span><span></span><span></span></div>
+    </div>
+  </nav>
+
+  <div class="page-header" style="padding-bottom:24px;">
+    <div id="article-container" class="article-detail">
+      <div class="loading"><div class="loading-spinner"></div><p>加载中...</p></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="container"><p>© 2026 CodeNinja. All Rights Reserved.</p></div>
+  </footer>
+
+  <button class="back-to-top" title="回到顶部">↑</button>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    (async function loadArticle() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      const container = document.getElementById('article-container');
+
+      if (!id) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>文章ID无效</p><a href="articles.html">← 返回文章列表</a></div>';
+        return;
+      }
+
+      try {
+        const res = await articlesAPI.detail(id);
+        const article = res.data;
+
+        document.title = article.title + ' - 个人网站';
+
+        container.innerHTML = `
+          <article class="card">
+            <a href="articles.html" style="display:inline-block;margin-bottom:16px;color:var(--text-muted);">← 返回文章列表</a>
+            <h1 class="article-title">${article.title}</h1>
+            <div class="article-meta">
+              <span>📁 ${article.category_name || '未分类'}</span>
+              <span>📅 ${new Date(article.published_at).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'})}</span>
+              <span>👁 ${article.view_count || 0} 阅读</span>
+            </div>
+            ${article.tags ? `<div style="margin-bottom:20px;">${article.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('')}</div>` : ''}
+            ${article.cover_image ? `<img src="${article.cover_image}" alt="${article.title}" style="width:100%;border-radius:12px;margin-bottom:24px;">` : ''}
+            <div class="article-body">${article.content}</div>
+          </article>
+        `;
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>文章不存在或加载失败</p><a href="articles.html">← 返回文章列表</a></div>';
+      }
+    })();
+  </script>
+</body>
+</html>

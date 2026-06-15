@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>相册管理 - 管理后台</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="admin-topbar">
+    <div class="brand">⚙️ 管理后台</div>
+    <div class="user-info">
+      <span id="admin-nickname">管理员</span>
+      <button id="logout-btn" class="logout-btn">退出登录</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-title">管理菜单</div>
+      <a href="dashboard.html"><span class="icon">📊</span> 仪表盘</a>
+      <a href="articles.html"><span class="icon">📝</span> 文章管理</a>
+      <a href="messages.html"><span class="icon">💬</span> 留言管理</a>
+      <a href="projects.html"><span class="icon">🚀</span> 项目管理</a>
+      <a href="gallery.html" class="active"><span class="icon">📷</span> 相册管理</a>
+      <a href="settings.html"><span class="icon">⚙️</span> 站点设置</a>
+    </aside>
+
+    <main class="admin-main">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <h2>📷 相册管理</h2>
+        <button class="btn btn-primary" onclick="openUploadModal()">+ 上传图片</button>
+      </div>
+
+      <div class="card" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr><th>预览</th><th>标题</th><th>分类</th><th>状态</th><th>上传时间</th><th>操作</th></tr>
+          </thead>
+          <tbody id="gallery-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:40px;">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- 上传Modal -->
+  <div id="upload-modal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="upload-title">上传图片</h3>
+      <form id="gallery-form">
+        <div class="form-group">
+          <label>选择图片 *</label>
+          <input type="file" id="gallery-file" accept="image/*" required>
+          <span class="hint">支持 jpg/png/gif/webp，最大10MB</span>
+        </div>
+        <div id="preview-container" style="display:none;margin-bottom:16px;">
+          <img id="preview-img" style="max-width:200px;max-height:150px;border-radius:8px;">
+        </div>
+        <div class="form-group">
+          <label>图片标题</label>
+          <input type="text" id="gallery-title" class="glow-input" placeholder="给图片起个名字">
+        </div>
+        <div class="form-group">
+          <label>分类</label>
+          <input type="text" id="gallery-category" class="glow-input" placeholder="如：风景、日常、工作" value="未分类">
+        </div>
+        <div class="form-group">
+          <label>排序</label>
+          <input type="number" id="gallery-sort" class="glow-input" value="0">
+        </div>
+        <input type="hidden" id="gallery-id">
+        <input type="hidden" id="gallery-existing-url">
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">上传</button>
+          <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/admin.js"></script>
+  <script>
+    async function loadGallery() {
+      const tbody = document.getElementById('gallery-tbody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;">加载中...</td></tr>';
+
+      try {
+        const res = await galleryAPI.list();
+        const images = res.data.images;
+
+        if (!images || images.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">暂无图片</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = images.map(img => `
+          <tr>
+            <td><img src="${img.image_url}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;"></td>
+            <td>${escapeHtml(img.title || '')}</td>
+            <td>${escapeHtml(img.category || '未分类')}</td>
+            <td><span class="badge ${img.status === 1 ? 'badge-success' : 'badge-warning'}">${img.status === 1 ? '展示' : '隐藏'}</span></td>
+            <td>${formatDate(img.created_at)}</td>
+            <td class="actions">
+              <button class="btn btn-sm btn-secondary" onclick="editImage(${img.id},'${escapeHtml(img.title||'')}','${escapeHtml(img.category||'')}',${img.sort_order},${img.status},'${img.image_url}')">编辑</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteImage(${img.id})">删除</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#ef4444;">加载失败</td></tr>';
+      }
+    }
+
+    function openUploadModal() {
+      document.getElementById('upload-title').textContent = '上传图片';
+      document.getElementById('gallery-form').reset();
+      document.getElementById('gallery-id').value = '';
+      document.getElementById('preview-container').style.display = 'none';
+      document.getElementById('upload-modal').classList.add('active');
+    }
+
+    function editImage(id, title, category, sort, status, url) {
+      document.getElementById('upload-title').textContent = '编辑图片';
+      document.getElementById('gallery-form').reset();
+      document.getElementById('gallery-id').value = id;
+      document.getElementById('gallery-title').value = title;
+      document.getElementById('gallery-category').value = category;
+      document.getElementById('gallery-sort').value = sort;
+      document.getElementById('gallery-existing-url').value = url;
+      document.getElementById('preview-img').src = url;
+      document.getElementById('preview-container').style.display = 'block';
+      document.getElementById('upload-modal').classList.add('active');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('upload-modal').classList.remove('active');
+    }
+
+    // 图片预览
+    document.getElementById('gallery-file').addEventListener('change', function() {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('preview-img').src = e.target.result;
+          document.getElementById('preview-container').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById('gallery-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('gallery-id').value;
+      const fileInput = document.getElementById('gallery-file');
+      const file = fileInput.files[0];
+
+      const data = {
+        title: document.getElementById('gallery-title').value.trim(),
+        category: document.getElementById('gallery-category').value.trim() || '未分类',
+        sort_order: parseInt(document.getElementById('gallery-sort').value) || 0,
+        status: 1
+      };
+
+      try {
+        if (id) {
+          if (file) {
+            data.image = file;
+          } else {
+            data.existing_image_url = document.getElementById('gallery-existing-url').value;
+          }
+          await galleryAPI.update(id, data);
+          showToast('图片更新成功', 'success');
+        } else {
+          if (!file) { showToast('请选择图片', 'error'); return; }
+          await galleryAPI.upload(file, data);
+          showToast('图片上传成功', 'success');
+        }
+        closeUploadModal();
+        loadGallery();
+      } catch (err) {
+        showToast('操作失败: ' + err.message, 'error');
+      }
+    });
+
+    async function deleteImage(id) {
+      if (!confirm('确定删除此图片吗？')) return;
+      try {
+        await galleryAPI.delete(id);
+        showToast('图片已删除', 'success');
+        loadGallery();
+      } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleString('zh-CN');
+    }
+
+    loadGallery();
+  </script>
+</body>
+</html>

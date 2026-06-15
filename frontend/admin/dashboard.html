@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 仪表盘</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <!-- 顶部栏 -->
+  <div class="admin-topbar">
+    <div class="brand">⚙️ 管理后台</div>
+    <div class="user-info">
+      <span id="admin-nickname">管理员</span>
+      <button id="logout-btn" class="logout-btn">退出登录</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <!-- 侧边栏 -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-title">管理菜单</div>
+      <a href="dashboard.html" class="active"><span class="icon">📊</span> 仪表盘</a>
+      <a href="articles.html"><span class="icon">📝</span> 文章管理</a>
+      <a href="messages.html"><span class="icon">💬</span> 留言管理</a>
+      <a href="projects.html"><span class="icon">🚀</span> 项目管理</a>
+      <a href="gallery.html"><span class="icon">📷</span> 相册管理</a>
+      <a href="settings.html"><span class="icon">⚙️</span> 站点设置</a>
+      <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border-color);">
+        <a href="../index.html" target="_blank"><span class="icon">🏠</span> 查看前台 →</a>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="admin-main">
+      <h2 style="margin-bottom:24px;">📊 仪表盘</h2>
+
+      <!-- 统计卡片 -->
+      <div class="stats-cards" id="stats-cards">
+        <div class="card stat-card"><div class="number">-</div><div class="label">文章总数</div></div>
+        <div class="card stat-card"><div class="number">-</div><div class="label">项目总数</div></div>
+        <div class="card stat-card"><div class="number">-</div><div class="label">留言总数</div></div>
+        <div class="card stat-card"><div class="number">-</div><div class="label">今日访问</div></div>
+        <div class="card stat-card"><div class="number">-</div><div class="label">总访问量</div></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-bottom:16px;">🚀 快捷操作</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a href="articles.html" class="btn btn-primary">写新文章</a>
+          <a href="projects.html" class="btn btn-secondary">添加项目</a>
+          <a href="gallery.html" class="btn btn-secondary">上传图片</a>
+          <a href="settings.html" class="btn btn-secondary">修改设置</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/admin.js"></script>
+  <script>
+    (async function loadDashboard() {
+      try {
+        const [statsRes, artRes, projRes, msgRes] = await Promise.all([
+          statsAPI.get(),
+          articlesAPI.list({ pageSize: 1 }),
+          projectsAPI.list(),
+          messagesAPI.adminList({ pageSize: 1 })
+        ]);
+
+        const stats = statsRes.data;
+        const cards = document.querySelectorAll('.stat-card .number');
+        cards[0].textContent = stats.articleCount || 0;
+        cards[1].textContent = stats.projectCount || 0;
+        cards[2].textContent = stats.messageCount || 0;
+        cards[3].textContent = stats.todayVisits || 0;
+        cards[4].textContent = stats.totalVisits || 0;
+      } catch (e) {
+        console.error('加载仪表盘数据失败:', e);
+      }
+    })();
+  </script>
+</body>
+</html>

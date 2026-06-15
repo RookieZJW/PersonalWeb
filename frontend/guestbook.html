@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>留言板 - 个人网站</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">&lt;<span>C</span>odeNinja /&gt;</a>
+      <div class="nav-links">
+        <a href="index.html">首页</a>
+        <a href="about.html">关于我</a>
+        <a href="articles.html">文章</a>
+        <a href="projects.html">项目</a>
+        <a href="gallery.html">相册</a>
+        <a href="guestbook.html" class="active">留言板</a>
+      </div>
+      <div class="hamburger"><span></span><span></span><span></span></div>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="section-title">留言板</h1>
+    <p style="color:var(--text-muted);margin-top:8px;">欢迎留下你的足迹，留言审核后展示</p>
+  </div>
+
+  <section class="section" style="padding-top:0;">
+    <div class="container" style="max-width:800px;">
+
+      <!-- 留言表单 -->
+      <div class="card message-form animate-fade-in-up">
+        <h3 style="margin-bottom:20px; color:var(--neon-blue);">✍️ 写留言</h3>
+        <form id="message-form">
+          <div class="form-row">
+            <input type="text" name="nickname" class="glow-input" placeholder="你的昵称 *" required maxlength="50">
+            <input type="email" name="email" class="glow-input" placeholder="邮箱（选填，不会公开）">
+          </div>
+          <textarea name="content" class="glow-textarea" placeholder="写下你想说的话..." required maxlength="2000" style="margin-bottom:16px;"></textarea>
+          <button type="submit" class="btn btn-primary">💬 提交留言</button>
+          <span id="form-hint" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px;"></span>
+        </form>
+      </div>
+
+      <!-- 留言列表 -->
+      <div id="message-list" class="message-list" style="margin-top:32px;"></div>
+
+      <!-- 分页 -->
+      <div id="pagination" class="pagination"></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container"><p>© 2026 CodeNinja. All Rights Reserved.</p></div>
+  </footer>
+
+  <button class="back-to-top" title="回到顶部">↑</button>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let currentPage = 1;
+
+    // 提交留言
+    document.getElementById('message-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const hint = document.getElementById('form-hint');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中...';
+      hint.textContent = '';
+
+      try {
+        await messagesAPI.submit({
+          nickname: form.nickname.value.trim(),
+          email: form.email.value.trim(),
+          content: form.content.value.trim()
+        });
+        hint.textContent = '✅ 留言提交成功，等待审核后展示';
+        hint.style.color = '#22c55e';
+        form.reset();
+      } catch (e) {
+        hint.textContent = '❌ ' + e.message;
+        hint.style.color = '#ef4444';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '💬 提交留言';
+      }
+    });
+
+    // 加载留言列表
+    async function loadMessages() {
+      const container = document.getElementById('message-list');
+      container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+      try {
+        const res = await messagesAPI.list({ page: currentPage, pageSize: 10 });
+        const { list, pagination } = res.data;
+
+        if (list.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">💬</div><p>暂无留言，来做第一个留言的人吧！</p></div>';
+          document.getElementById('pagination').innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = list.map(msg => `
+          <div class="card message-item animate-fade-in-up">
+            <div class="msg-header">
+              <span class="msg-author">${escapeHtml(msg.nickname)}</span>
+              <span class="msg-time">${formatDate(msg.created_at)}</span>
+            </div>
+            <div class="msg-content">${escapeHtml(msg.content)}</div>
+            ${msg.reply ? `<div class="msg-reply">👨‍💻 <strong>博主回复：</strong>${escapeHtml(msg.reply)}</div>` : ''}
+          </div>
+        `).join('');
+
+        // 分页
+        const pagContainer = document.getElementById('pagination');
+        if (pagination.totalPages <= 1) {
+          pagContainer.innerHTML = '';
+        } else {
+          let html = '';
+          for (let i = 1; i <= pagination.totalPages; i++) {
+            html += `<button class="page-btn ${i === pagination.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
+          }
+          pagContainer.innerHTML = html;
+          pagContainer.querySelectorAll('.page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              currentPage = parseInt(btn.dataset.page);
+              window.scrollTo({ top: 500, behavior: 'smooth' });
+              loadMessages();
+            });
+          });
+        }
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载留言失败</p></div>';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      return new Date(dateStr).toLocaleDateString('zh-CN', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    }
+
+    loadMessages();
+  </script>
+</body>
+</html>

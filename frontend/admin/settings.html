@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>站点设置 - 管理后台</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="admin-topbar">
+    <div class="brand">⚙️ 管理后台</div>
+    <div class="user-info">
+      <span id="admin-nickname">管理员</span>
+      <button id="logout-btn" class="logout-btn">退出登录</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-title">管理菜单</div>
+      <a href="dashboard.html"><span class="icon">📊</span> 仪表盘</a>
+      <a href="articles.html"><span class="icon">📝</span> 文章管理</a>
+      <a href="messages.html"><span class="icon">💬</span> 留言管理</a>
+      <a href="projects.html"><span class="icon">🚀</span> 项目管理</a>
+      <a href="gallery.html"><span class="icon">📷</span> 相册管理</a>
+      <a href="settings.html" class="active"><span class="icon">⚙️</span> 站点设置</a>
+    </aside>
+
+    <main class="admin-main">
+      <h2 style="margin-bottom:24px;">⚙️ 站点设置</h2>
+
+      <form id="settings-form">
+        <!-- 基本信息 -->
+        <div class="card" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:20px;color:var(--neon-blue);">📋 基本信息</h3>
+          <div class="form-group">
+            <label>网站标题</label>
+            <input type="text" id="site_title" class="glow-input" placeholder="浏览器标签页显示的标题">
+          </div>
+          <div class="form-group">
+            <label>网站副标题</label>
+            <input type="text" id="site_subtitle" class="glow-input" placeholder="SEO描述文字">
+          </div>
+          <div class="form-group">
+            <label>个人昵称</label>
+            <input type="text" id="nickname" class="glow-input">
+          </div>
+          <div class="form-group">
+            <label>个性签名</label>
+            <input type="text" id="signature" class="glow-input" placeholder="一句话介绍自己">
+          </div>
+          <div class="form-group">
+            <label>个人简介</label>
+            <textarea id="bio" class="glow-textarea" rows="5" placeholder="介绍你自己..."></textarea>
+          </div>
+        </div>
+
+        <!-- 头像上传 -->
+        <div class="card" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:20px;color:var(--neon-blue);">🖼 头像</h3>
+          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+            <img id="current-avatar" src="" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--neon-blue);">
+            <div>
+              <input type="file" id="avatar-file" accept="image/*">
+              <button type="button" class="btn btn-sm btn-secondary" onclick="uploadAvatar()" style="margin-top:8px;">上传新头像</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 技术栈与经历 -->
+        <div class="card" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:20px;color:var(--neon-blue);">🛠 技术栈与经历</h3>
+          <div class="form-group">
+            <label>技术标签（JSON数组格式）</label>
+            <textarea id="tech_stack" class="glow-textarea" rows="3" placeholder='["JavaScript","Node.js","Python"]'></textarea>
+          </div>
+          <div class="form-group">
+            <label>从业/学习经历（JSON数组格式）</label>
+            <textarea id="experience" class="glow-textarea" rows="6" placeholder='[{"title":"职位","period":"时间","desc":"描述"}]'></textarea>
+            <span class="hint">格式: [{"title":"xxx", "period":"2020-2023", "desc":"xxx"}, ...]</span>
+          </div>
+          <div class="form-group">
+            <label>社交链接（JSON数组格式）</label>
+            <textarea id="social_links" class="glow-textarea" rows="4" placeholder='[{"name":"GitHub","url":"https://github.com/xxx","icon":"github"}]'></textarea>
+          </div>
+        </div>
+
+        <!-- 页脚 -->
+        <div class="card" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:20px;color:var(--neon-blue);">📄 页脚设置</h3>
+          <div class="form-group">
+            <label>页脚版权信息</label>
+            <input type="text" id="footer_copyright" class="glow-input" placeholder="© 2026 YourName. All Rights Reserved.">
+          </div>
+        </div>
+
+        <!-- 提交按钮 -->
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">💾 保存所有设置</button>
+          <span id="save-hint" style="font-size:0.85rem;color:var(--text-muted);margin-left:12px;"></span>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/admin.js"></script>
+  <script>
+    // 加载当前设置
+    async function loadSettings() {
+      try {
+        const res = await settingsAPI.get();
+        const s = res.data;
+
+        // 填充表单
+        document.getElementById('site_title').value = s.site_title || '';
+        document.getElementById('site_subtitle').value = s.site_subtitle || '';
+        document.getElementById('nickname').value = s.nickname || '';
+        document.getElementById('signature').value = s.signature || '';
+        document.getElementById('bio').value = s.bio || '';
+        document.getElementById('footer_copyright').value = s.footer_copyright || '';
+
+        // JSON字段格式化
+        if (s.tech_stack) document.getElementById('tech_stack').value = JSON.stringify(s.tech_stack, null, 2);
+        if (s.experience) document.getElementById('experience').value = JSON.stringify(s.experience, null, 2);
+        if (s.social_links) document.getElementById('social_links').value = JSON.stringify(s.social_links, null, 2);
+
+        // 头像
+        if (s.avatar_url) {
+          document.getElementById('current-avatar').src = s.avatar_url;
+        }
+      } catch (e) {
+        showToast('加载设置失败: ' + e.message, 'error');
+      }
+    }
+
+    // 上传头像
+    async function uploadAvatar() {
+      const fileInput = document.getElementById('avatar-file');
+      const file = fileInput.files[0];
+      if (!file) { showToast('请先选择文件', 'error'); return; }
+
+      try {
+        const res = await settingsAPI.uploadAvatar(file);
+        document.getElementById('current-avatar').src = res.data.avatar_url + '?t=' + Date.now();
+        showToast('头像上传成功', 'success');
+      } catch (e) {
+        showToast('头像上传失败: ' + e.message, 'error');
+      }
+    }
+
+    // 保存设置
+    document.getElementById('settings-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const hint = document.getElementById('save-hint');
+      hint.textContent = '保存中...';
+
+      const data = {
+        site_title: document.getElementById('site_title').value.trim(),
+        site_subtitle: document.getElementById('site_subtitle').value.trim(),
+        nickname: document.getElementById('nickname').value.trim(),
+        signature: document.getElementById('signature').value.trim(),
+        bio: document.getElementById('bio').value.trim(),
+        footer_copyright: document.getElementById('footer_copyright').value.trim(),
+        tech_stack: parseJsonField('tech_stack'),
+        experience: parseJsonField('experience'),
+        social_links: parseJsonField('social_links')
+      };
+
+      try {
+        await settingsAPI.update(data);
+        hint.textContent = '✅ 设置保存成功！';
+        hint.style.color = '#22c55e';
+        setTimeout(() => { hint.textContent = ''; }, 3000);
+      } catch (err) {
+        hint.textContent = '❌ 保存失败: ' + err.message;
+        hint.style.color = '#ef4444';
+      }
+    });
+
+    function parseJsonField(id) {
+      const raw = document.getElementById(id).value.trim();
+      if (!raw) return [];
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        throw new Error('「' + id + '」JSON格式错误，请检查');
+      }
+    }
+
+    loadSettings();
+  </script>
+</body>
+</html>

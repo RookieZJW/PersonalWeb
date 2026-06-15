@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文章随笔 - 个人网站</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">&lt;<span>C</span>odeNinja /&gt;</a>
+      <div class="nav-links">
+        <a href="index.html">首页</a>
+        <a href="about.html">关于我</a>
+        <a href="articles.html" class="active">文章</a>
+        <a href="projects.html">项目</a>
+        <a href="gallery.html">相册</a>
+        <a href="guestbook.html">留言板</a>
+      </div>
+      <div class="hamburger"><span></span><span></span><span></span></div>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="section-title">文章随笔</h1>
+  </div>
+
+  <section class="section" style="padding-top:0;">
+    <div class="container">
+      <!-- 筛选栏 -->
+      <div class="articles-filter">
+        <div id="filter-categories" class="filter-categories">
+          <button class="filter-cat active" data-category="">全部</button>
+        </div>
+        <div class="search-box">
+          <input type="text" id="search-input" class="glow-input" placeholder="搜索文章...">
+          <span class="search-icon">🔍</span>
+        </div>
+      </div>
+
+      <!-- 文章列表 -->
+      <div id="articles-list" class="articles-grid"></div>
+
+      <!-- 分页 -->
+      <div id="pagination" class="pagination"></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container"><p>© 2026 CodeNinja. All Rights Reserved.</p></div>
+  </footer>
+
+  <button class="back-to-top" title="回到顶部">↑</button>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let currentPage = 1;
+    let currentCategory = '';
+    let currentKeyword = '';
+
+    // 加载分类
+    async function loadCategories() {
+      try {
+        const res = await articlesAPI.categories();
+        const container = document.getElementById('filter-categories');
+        container.innerHTML = '<button class="filter-cat active" data-category="">全部</button>';
+        res.data.forEach(cat => {
+          const btn = document.createElement('button');
+          btn.className = 'filter-cat';
+          btn.dataset.category = cat.slug;
+          btn.textContent = cat.name;
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-cat').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentCategory = cat.slug;
+            currentPage = 1;
+            loadArticles();
+          });
+          container.appendChild(btn);
+        });
+      } catch (e) { console.error('加载分类失败:', e); }
+    }
+
+    // 加载文章列表
+    async function loadArticles() {
+      const container = document.getElementById('articles-list');
+      container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>加载中...</p></div>';
+
+      try {
+        const params = { page: currentPage, pageSize: 10 };
+        if (currentCategory) params.category = currentCategory;
+        if (currentKeyword) params.keyword = currentKeyword;
+
+        const res = await articlesAPI.list(params);
+        const { list, pagination } = res.data;
+
+        if (list.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无文章</p></div>';
+          document.getElementById('pagination').innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = list.map(article => `
+          <article class="card article-card animate-fade-in-up" onclick="location.href='article-detail.html?id=${article.id}'">
+            ${article.cover_image ? `<img class="cover" src="${article.cover_image}" alt="${article.title}" loading="lazy">` : ''}
+            <div class="meta">
+              <span>${article.category_name || '未分类'}</span>
+              <span>${formatDate(article.published_at)}</span>
+              <span>👁 ${article.view_count}</span>
+            </div>
+            <h2 class="title"><a href="article-detail.html?id=${article.id}">${article.title}</a></h2>
+            <p class="summary">${article.summary || ''}</p>
+            ${article.tags ? `<div style="margin-top:12px;">${article.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('')}</div>` : ''}
+          </article>
+        `).join('');
+
+        // 分页
+        renderPagination(pagination);
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载失败，请检查后端服务</p></div>';
+      }
+    }
+
+    function renderPagination(p) {
+      const container = document.getElementById('pagination');
+      if (p.totalPages <= 1) { container.innerHTML = ''; return; }
+
+      let html = `<button class="page-btn" ${p.page <= 1 ? 'disabled' : ''} data-page="${p.page - 1}">◀</button>`;
+      for (let i = 1; i <= p.totalPages; i++) {
+        html += `<button class="page-btn ${i === p.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
+      }
+      html += `<button class="page-btn" ${p.page >= p.totalPages ? 'disabled' : ''} data-page="${p.page + 1}">▶</button>`;
+      container.innerHTML = html;
+
+      container.querySelectorAll('.page-btn:not([disabled])').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentPage = parseInt(btn.dataset.page);
+          window.scrollTo({ top: 400, behavior: 'smooth' });
+          loadArticles();
+        });
+      });
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // 搜索防抖
+    let searchTimer;
+    document.getElementById('search-input').addEventListener('input', function() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        currentKeyword = this.value.trim();
+        currentPage = 1;
+        loadArticles();
+      }, 400);
+    });
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      loadCategories();
+      loadArticles();
+    });
+  </script>
+</body>
+</html>

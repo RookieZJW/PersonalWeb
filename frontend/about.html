@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>关于我 - 个人网站</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">&lt;<span>C</span>odeNinja /&gt;</a>
+      <div class="nav-links">
+        <a href="index.html">首页</a>
+        <a href="about.html" class="active">关于我</a>
+        <a href="articles.html">文章</a>
+        <a href="projects.html">项目</a>
+        <a href="gallery.html">相册</a>
+        <a href="guestbook.html">留言板</a>
+      </div>
+      <div class="hamburger"><span></span><span></span><span></span></div>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="section-title">关于我</h1>
+  </div>
+
+  <section class="section" style="padding-top:0;">
+    <div class="container">
+      <div class="about-grid">
+        <!-- 左侧：个人简介 -->
+        <div class="card animate-fade-in-up">
+          <h3 style="margin-bottom:16px; color:var(--neon-blue);">📋 个人简介</h3>
+          <p id="about-bio" class="about-bio">加载中...</p>
+        </div>
+        <!-- 右侧：技术栈 -->
+        <div class="card animate-fade-in-up">
+          <h3 style="margin-bottom:16px; color:var(--neon-blue);">🛠 技术栈</h3>
+          <div id="about-tech" class="tech-stack">加载中...</div>
+        </div>
+      </div>
+
+      <!-- 经历时间线 -->
+      <div class="card animate-fade-in-up" style="margin-top:24px;">
+        <h3 style="margin-bottom:24px; color:var(--neon-blue);">📌 经历</h3>
+        <div id="about-timeline" class="timeline">加载中...</div>
+      </div>
+
+      <!-- 社交链接 -->
+      <div class="card animate-fade-in-up" style="margin-top:24px;">
+        <h3 style="margin-bottom:16px; color:var(--neon-blue);">🔗 社交与联系</h3>
+        <div id="about-social" class="social-links">加载中...</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container"><p id="footer-text">© 2026</p></div>
+  </footer>
+
+  <button class="back-to-top" title="回到顶部">↑</button>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    (async function() {
+      try {
+        const res = await settingsAPI.get();
+        const s = res.data;
+
+        // 简介
+        document.getElementById('about-bio').textContent = s.bio || '暂无简介';
+
+        // 技术栈标签
+        const techContainer = document.getElementById('about-tech');
+        if (s.tech_stack && Array.isArray(s.tech_stack)) {
+          techContainer.innerHTML = s.tech_stack.map(t => `<span class="tag">${t}</span>`).join('');
+        } else {
+          techContainer.textContent = '暂无数据';
+        }
+
+        // 经历时间线
+        const timelineContainer = document.getElementById('about-timeline');
+        if (s.experience && Array.isArray(s.experience)) {
+          timelineContainer.innerHTML = s.experience.map(exp => `
+            <div class="timeline-item">
+              <div class="period">${exp.period}</div>
+              <div class="title">${exp.title}</div>
+              <div class="desc">${exp.desc}</div>
+            </div>
+          `).join('');
+        } else {
+          timelineContainer.textContent = '暂无经历数据';
+        }
+
+        // 社交链接
+        const socialContainer = document.getElementById('about-social');
+        const iconMap = { github: '🔗', email: '📧', wechat: '💬', twitter: '🐦' };
+        if (s.social_links && Array.isArray(s.social_links)) {
+          socialContainer.innerHTML = s.social_links.map(link => `
+            <a href="${link.url}" class="social-link" target="_blank" rel="noopener">
+              <span>${iconMap[link.icon] || '🔗'}</span> ${link.name}
+            </a>
+          `).join('');
+        } else {
+          socialContainer.textContent = '暂无社交链接';
+        }
+
+        // 页脚
+        document.getElementById('footer-text').textContent = s.footer_copyright || '© 2026';
+      } catch (e) {
+        console.error('加载关于页数据失败:', e);
+      }
+    })();
+  </script>
+</body>
+</html>

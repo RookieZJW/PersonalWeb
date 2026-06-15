@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目展示 - 个人网站</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">&lt;<span>C</span>odeNinja /&gt;</a>
+      <div class="nav-links">
+        <a href="index.html">首页</a>
+        <a href="about.html">关于我</a>
+        <a href="articles.html">文章</a>
+        <a href="projects.html" class="active">项目</a>
+        <a href="gallery.html">相册</a>
+        <a href="guestbook.html">留言板</a>
+      </div>
+      <div class="hamburger"><span></span><span></span><span></span></div>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="section-title">项目展示</h1>
+  </div>
+
+  <section class="section" style="padding-top:0;">
+    <div class="container">
+      <div id="projects-list" class="projects-grid">
+        <div class="loading"><div class="loading-spinner"></div><p>加载中...</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container"><p>© 2026 CodeNinja. All Rights Reserved.</p></div>
+  </footer>
+
+  <button class="back-to-top" title="回到顶部">↑</button>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    (async function loadProjects() {
+      const container = document.getElementById('projects-list');
+      try {
+        const res = await projectsAPI.list();
+        const projects = res.data;
+
+        if (!projects || projects.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">🚀</div><p>暂无项目展示</p></div>';
+          return;
+        }
+
+        container.innerHTML = projects.map(p => `
+          <div class="card project-card animate-fade-in-up">
+            ${p.thumbnail ? `<img class="thumbnail" src="${p.thumbnail}" alt="${p.title}" loading="lazy">` : ''}
+            <h3 style="font-size:1.2rem;">${p.title}</h3>
+            <p style="color:var(--text-secondary);margin-top:8px;line-height:1.7;">${p.description || ''}</p>
+            <div class="tech-tags">
+              ${(p.tech_tags || '').split(',').filter(Boolean).map(t => `<span class="tag">${t.trim()}</span>`).join('')}
+            </div>
+            <div class="project-links">
+              ${p.demo_url ? `<a href="${p.demo_url}" class="btn btn-sm btn-primary" target="_blank" rel="noopener">🌐 在线预览</a>` : ''}
+              ${p.github_url ? `<a href="${p.github_url}" class="btn btn-sm btn-secondary" target="_blank" rel="noopener">📦 Git仓库</a>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载项目失败，请检查后端服务</p></div>';
+      }
+    })();
+  </script>
+</body>
+</html>
