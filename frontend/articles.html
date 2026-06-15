@@ -25,6 +25,8 @@
     </div>
   </nav>
 
+  <main id="app-content">
+
   <div class="page-header">
     <h1 class="section-title">文章随笔</h1>
   </div>
@@ -50,6 +52,8 @@
     </div>
   </section>
 
+  </main>
+
   <footer class="footer">
     <div class="container"><p>© 2026 CodeNinja. All Rights Reserved.</p></div>
   </footer>
@@ -59,115 +63,128 @@
   <script src="js/api.js"></script>
   <script src="js/main.js"></script>
   <script>
-    let currentPage = 1;
-    let currentCategory = '';
-    let currentKeyword = '';
+    (function() {
+      var currentPage = 1;
+      var currentCategory = '';
+      var currentKeyword = '';
 
-    // 加载分类
-    async function loadCategories() {
-      try {
-        const res = await articlesAPI.categories();
-        const container = document.getElementById('filter-categories');
-        container.innerHTML = '<button class="filter-cat active" data-category="">全部</button>';
-        res.data.forEach(cat => {
-          const btn = document.createElement('button');
-          btn.className = 'filter-cat';
-          btn.dataset.category = cat.slug;
-          btn.textContent = cat.name;
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-cat').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentCategory = cat.slug;
-            currentPage = 1;
+      // 加载分类
+      async function loadCategories() {
+        try {
+          var res = await articlesAPI.categories();
+          var data = res.data || res;
+          var cats = Array.isArray(data) ? data : (data.categories || data.list || []);
+          var container = document.getElementById('filter-categories');
+          if (!container) return;
+          container.innerHTML = '<button class="filter-cat active" data-category="">全部</button>';
+          cats.forEach(function(cat) {
+            var btn = document.createElement('button');
+            btn.className = 'filter-cat';
+            btn.dataset.category = cat.slug || cat.name;
+            btn.textContent = cat.name;
+            btn.addEventListener('click', function() {
+              document.querySelectorAll('#filter-categories .filter-cat').forEach(function(b) { b.classList.remove('active'); });
+              btn.classList.add('active');
+              currentCategory = cat.slug || cat.name;
+              currentPage = 1;
+              loadArticles();
+            });
+            container.appendChild(btn);
+          });
+        } catch(e) { console.error('加载分类失败:', e); }
+      }
+
+      // 加载文章列表
+      async function loadArticles() {
+        var container = document.getElementById('articles-list');
+        if (!container) return;
+        container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>加载中...</p></div>';
+
+        try {
+          var params = { page: currentPage, pageSize: 10 };
+          if (currentCategory) params.category = currentCategory;
+          if (currentKeyword) params.keyword = currentKeyword;
+
+          var res = await articlesAPI.list(params);
+          var data = res.data || res;
+          var list = data.list || [];
+          var pagination = data.pagination || {};
+
+          if (list.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无文章</p></div>';
+            var pagEl = document.getElementById('pagination');
+            if (pagEl) pagEl.innerHTML = '';
+            return;
+          }
+
+          container.innerHTML = list.map(function(article) {
+            return '<article class="card article-card animate-fade-in-up" onclick="router.navigate(\'article-detail.html?id=' + article.id + '\')">' +
+              (article.cover_image ? '<img class="cover" src="' + article.cover_image + '" alt="' + article.title + '" loading="lazy">' : '') +
+              '<div class="meta">' +
+                '<span>' + (article.category_name || '未分类') + '</span>' +
+                '<span>' + formatDate(article.published_at) + '</span>' +
+                '<span>👁 ' + (article.view_count || 0) + '</span>' +
+              '</div>' +
+              '<h2 class="title"><a href="article-detail.html?id=' + article.id + '">' + article.title + '</a></h2>' +
+              '<p class="summary">' + (article.summary || '') + '</p>' +
+              (article.tags ? '<div style="margin-top:12px;">' + article.tags.split(',').map(function(t) { return '<span class="tag">' + t.trim() + '</span>'; }).join('') + '</div>' : '') +
+            '</article>';
+          }).join('');
+
+          // 分页
+          renderPagination(pagination);
+        } catch(e) {
+          console.error('加载文章失败:', e);
+          container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载失败: ' + e.message + '</p></div>';
+        }
+      }
+
+      function renderPagination(p) {
+        var container = document.getElementById('pagination');
+        if (!container) return;
+        if (!p || p.totalPages <= 1) { container.innerHTML = ''; return; }
+
+        var html = '<button class="page-btn" ' + (p.page <= 1 ? 'disabled' : '') + ' data-page="' + (p.page - 1) + '">◀</button>';
+        for (var i = 1; i <= p.totalPages; i++) {
+          html += '<button class="page-btn ' + (i === p.page ? 'active' : '') + '" data-page="' + i + '">' + i + '</button>';
+        }
+        html += '<button class="page-btn" ' + (p.page >= p.totalPages ? 'disabled' : '') + ' data-page="' + (p.page + 1) + '">▶</button>';
+        container.innerHTML = html;
+
+        container.querySelectorAll('.page-btn:not([disabled])').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            currentPage = parseInt(btn.dataset.page);
+            window.scrollTo({ top: 400, behavior: 'smooth' });
             loadArticles();
           });
-          container.appendChild(btn);
         });
-      } catch (e) { console.error('加载分类失败:', e); }
-    }
-
-    // 加载文章列表
-    async function loadArticles() {
-      const container = document.getElementById('articles-list');
-      container.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>加载中...</p></div>';
-
-      try {
-        const params = { page: currentPage, pageSize: 10 };
-        if (currentCategory) params.category = currentCategory;
-        if (currentKeyword) params.keyword = currentKeyword;
-
-        const res = await articlesAPI.list(params);
-        const { list, pagination } = res.data;
-
-        if (list.length === 0) {
-          container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无文章</p></div>';
-          document.getElementById('pagination').innerHTML = '';
-          return;
-        }
-
-        container.innerHTML = list.map(article => `
-          <article class="card article-card animate-fade-in-up" onclick="location.href='article-detail.html?id=${article.id}'">
-            ${article.cover_image ? `<img class="cover" src="${article.cover_image}" alt="${article.title}" loading="lazy">` : ''}
-            <div class="meta">
-              <span>${article.category_name || '未分类'}</span>
-              <span>${formatDate(article.published_at)}</span>
-              <span>👁 ${article.view_count}</span>
-            </div>
-            <h2 class="title"><a href="article-detail.html?id=${article.id}">${article.title}</a></h2>
-            <p class="summary">${article.summary || ''}</p>
-            ${article.tags ? `<div style="margin-top:12px;">${article.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('')}</div>` : ''}
-          </article>
-        `).join('');
-
-        // 分页
-        renderPagination(pagination);
-      } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载失败，请检查后端服务</p></div>';
       }
-    }
 
-    function renderPagination(p) {
-      const container = document.getElementById('pagination');
-      if (p.totalPages <= 1) { container.innerHTML = ''; return; }
-
-      let html = `<button class="page-btn" ${p.page <= 1 ? 'disabled' : ''} data-page="${p.page - 1}">◀</button>`;
-      for (let i = 1; i <= p.totalPages; i++) {
-        html += `<button class="page-btn ${i === p.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
+      function formatDate(dateStr) {
+        if (!dateStr) return '';
+        var d = new Date(dateStr);
+        return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
       }
-      html += `<button class="page-btn" ${p.page >= p.totalPages ? 'disabled' : ''} data-page="${p.page + 1}">▶</button>`;
-      container.innerHTML = html;
 
-      container.querySelectorAll('.page-btn:not([disabled])').forEach(btn => {
-        btn.addEventListener('click', () => {
-          currentPage = parseInt(btn.dataset.page);
-          window.scrollTo({ top: 400, behavior: 'smooth' });
-          loadArticles();
+      // 搜索防抖
+      var searchInput = document.getElementById('search-input');
+      var searchTimer;
+      if (searchInput) {
+        searchInput.addEventListener('input', function() {
+          clearTimeout(searchTimer);
+          var self = this;
+          searchTimer = setTimeout(function() {
+            currentKeyword = self.value.trim();
+            currentPage = 1;
+            loadArticles();
+          }, 400);
         });
-      });
-    }
+      }
 
-    function formatDate(dateStr) {
-      if (!dateStr) return '';
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-    }
-
-    // 搜索防抖
-    let searchTimer;
-    document.getElementById('search-input').addEventListener('input', function() {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => {
-        currentKeyword = this.value.trim();
-        currentPage = 1;
-        loadArticles();
-      }, 400);
-    });
-
-    // 初始化
-    document.addEventListener('DOMContentLoaded', () => {
+      // 初始化
       loadCategories();
       loadArticles();
-    });
+    })();
   </script>
 </body>
 </html>

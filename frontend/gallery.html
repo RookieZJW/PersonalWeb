@@ -25,6 +25,8 @@
     </div>
   </nav>
 
+  <main id="app-content">
+
   <div class="page-header">
     <h1 class="section-title">相册图集</h1>
   </div>
@@ -47,6 +49,8 @@
     <img src="" alt="大图预览">
   </div>
 
+  </main>
+
   <footer class="footer">
     <div class="container"><p>© 2026 CodeNinja. All Rights Reserved.</p></div>
   </footer>
@@ -56,86 +60,105 @@
   <script src="js/api.js"></script>
   <script src="js/main.js"></script>
   <script>
-    let currentCategory = '';
-    let allCategories = [];
+    (function() {
+      let currentCategory = '';
+      let allCategories = [];
 
-    // 加载相册
-    async function loadGallery() {
-      const container = document.getElementById('gallery-grid');
-      container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
-
-      try {
-        const params = currentCategory ? { category: currentCategory } : {};
-        const res = await galleryAPI.list(params);
-        const { images, categories } = res.data;
-
-        // 更新分类筛选
-        allCategories = categories || [];
-        renderCategories();
-
-        if (!images || images.length === 0) {
-          container.innerHTML = '<div class="empty-state"><div class="icon">📷</div><p>暂无图片</p></div>';
+      // 加载相册
+      async function loadGallery() {
+        const container = document.getElementById('gallery-grid');
+        if (!container) {
+          console.error('[相册] 找不到 #gallery-grid 元素');
           return;
         }
+        container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
 
-        container.innerHTML = images.map(img => `
-          <div class="gallery-item animate-fade-in-up" data-src="${img.image_url}" data-title="${img.title || ''}">
-            <img src="${img.image_url}" alt="${img.title || ''}" loading="lazy">
-            <div class="overlay"><span>${img.title || ''}</span></div>
-          </div>
-        `).join('');
+        try {
+          const params = currentCategory ? { category: currentCategory } : {};
+          const res = await galleryAPI.list(params);
+          const data = res.data || res;
+          const images = data.images || [];
+          const categories = data.categories || [];
 
-        // 绑定点击事件 — 大图预览
-        container.querySelectorAll('.gallery-item').forEach(item => {
-          item.addEventListener('click', () => {
-            const lightbox = document.getElementById('lightbox');
-            lightbox.querySelector('img').src = item.dataset.src;
-            lightbox.classList.add('active');
+          // 更新分类筛选
+          allCategories = categories;
+          renderCategories();
+
+          if (images.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📷</div><p>暂无图片</p></div>';
+            return;
+          }
+
+          container.innerHTML = images.map(img => `
+            <div class="gallery-item animate-fade-in-up" data-src="${img.image_url}" data-title="${img.title || ''}">
+              <img src="${img.image_url}" alt="${img.title || ''}" loading="lazy">
+              <div class="overlay"><span>${img.title || ''}</span></div>
+            </div>
+          `).join('');
+
+          // 绑定点击事件 — 大图预览
+          container.querySelectorAll('.gallery-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const lb = document.getElementById('lightbox');
+              if (!lb) return;
+              lb.querySelector('img').src = item.dataset.src;
+              lb.classList.add('active');
+            });
           });
+
+        } catch (e) {
+          console.error('[相册] 加载失败:', e);
+          container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载相册失败: ' + e.message + '</p></div>';
+        }
+      }
+
+      function renderCategories() {
+        const container = document.getElementById('gallery-filter');
+        if (!container) return;
+        container.innerHTML = '<button class="filter-cat ' + (!currentCategory ? 'active' : '') + '" data-category="">全部</button>';
+        allCategories.forEach(function(cat) {
+          const btn = document.createElement('button');
+          btn.className = 'filter-cat ' + (currentCategory === cat ? 'active' : '');
+          btn.textContent = cat;
+          btn.dataset.category = cat;
+          btn.addEventListener('click', function() {
+            currentCategory = cat;
+            loadGallery();
+          });
+          container.appendChild(btn);
         });
 
-      } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载相册失败</p></div>';
+        // "全部"按钮
+        var allBtn = container.querySelector('[data-category=""]');
+        if (allBtn) {
+          allBtn.addEventListener('click', function() {
+            currentCategory = '';
+            loadGallery();
+          });
+        }
       }
-    }
 
-    function renderCategories() {
-      const container = document.getElementById('gallery-filter');
-      container.innerHTML = '<button class="filter-cat ' + (!currentCategory ? 'active' : '') + '" data-category="">全部</button>';
-      allCategories.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.className = 'filter-cat ' + (currentCategory === cat ? 'active' : '');
-        btn.textContent = cat;
-        btn.dataset.category = cat;
-        btn.addEventListener('click', () => {
-          currentCategory = cat;
-          loadGallery();
+      // 关闭灯箱
+      var lightbox = document.getElementById('lightbox');
+      if (lightbox) {
+        lightbox.addEventListener('click', function(e) {
+          if (e.target === this || e.target.classList.contains('close-btn')) {
+            this.classList.remove('active');
+          }
         });
-        container.appendChild(btn);
+      }
+
+      // ESC关闭灯箱（页面切换后元素可能不存在，需防御）
+      document.addEventListener('keydown', function galleryEscHandler(e) {
+        if (e.key === 'Escape') {
+          var lb = document.getElementById('lightbox');
+          if (lb) lb.classList.remove('active');
+        }
       });
 
-      // "全部"按钮
-      container.querySelector('[data-category=""]').addEventListener('click', () => {
-        currentCategory = '';
-        loadGallery();
-      });
-    }
-
-    // 关闭灯箱
-    document.getElementById('lightbox').addEventListener('click', function(e) {
-      if (e.target === this || e.target.classList.contains('close-btn')) {
-        this.classList.remove('active');
-      }
-    });
-
-    // ESC关闭灯箱
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        document.getElementById('lightbox').classList.remove('active');
-      }
-    });
-
-    loadGallery();
+      // 启动加载
+      loadGallery();
+    })();
   </script>
 </body>
 </html>

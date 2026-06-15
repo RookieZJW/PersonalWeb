@@ -232,4 +232,36 @@
     recordVisit();
   });
 
+  // ==================== 供路由器调用的重新初始化函数 ====================
+
+  let _scrollObserver = null;
+
+  // 重新观察滚动动画（内容交换后调用）
+  window.reinitScrollAnimations = function() {
+    // 断开旧的观察器
+    if (_scrollObserver) {
+      _scrollObserver.disconnect();
+      _scrollObserver = null;
+    }
+
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    _scrollObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => {
+            entry.target.classList.add('animate-fade-in-up');
+          }, Array.from(entry.target.parentNode?.children || []).indexOf(entry.target) * 80);
+          _scrollObserver.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.card, .timeline-item, .gallery-item, .project-card, .article-card')
+      .forEach(el => _scrollObserver.observe(el));
+  };
+
 })();
